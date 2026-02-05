@@ -373,7 +373,9 @@ function TintometricoTab() {
   const [sku, setSku] = useState('');
   const [quantity, setQuantity] = useState('');
   const [foundProduct, setFoundProduct] = useState<any>(null);
-  
+
+  const [status, setStatus] = useState<'success' | 'error' | null>(null);
+
   const skuInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1027,29 +1029,41 @@ function StockTab() {
           LIMPIAR TODO
         </button>
         <button
-          onClick={() => {
-            const wb = XLSX.utils.book_new();
-            const wsData = [
-              ['CODIGO', 'DESCRIPCION', 'EAN', 'CANTIDAD_CONTADA', 'CANTIDAD_SISTEMA', 'DIFERENCIA', 'ESTADO'],
-              ...filteredRecords.map(r => [
-                r.code,
-                r.description,
-                r.ean,
-                r.counted_quantity || 0,
-                r.system_quantity || 0,
-                r.difference || 0,
-                r.status || 'SIN_DATOS'
-              ])
-            ];
-            const ws = XLSX.utils.aoa_to_sheet(wsData);
-            XLSX.utils.book_append_sheet(wb, ws, 'Stock');
-            XLSX.writeFile(wb, `comparacion_stock_${new Date().toISOString().split('T')[0]}.xlsx`);
-          }}
-          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg flex items-center justify-center gap-2"
-        >
-          <Download className="w-5 h-5" />
-          EXPORTAR EXCEL
-        </button>
+  onClick={() => {
+    // 1. Crear el libro y la hoja
+    const wb = XLSX.utils.book_new();
+    const wsData = [
+      ['CODIGO', 'DESCRIPCION', 'EAN', 'CANTIDAD_CONTADA', 'CANTIDAD_SISTEMA', 'DIFERENCIA', 'ESTADO'],
+      ...filteredRecords.map(r => [
+        r.code,
+        r.description,
+        r.ean,
+        r.counted_quantity || 0,
+        r.system_quantity || 0,
+        r.difference || 0,
+        r.status || 'SIN_DATOS'
+      ])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+
+    // 2. Lógica de fecha DDMMAA (Ej: 050226)
+    const hoy = new Date();
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const anio = String(hoy.getFullYear()).slice(-2);
+    
+    // 3. Nombre exacto: "inventario,DDMMAA.xlsx"
+    const nombreFinal = `inventario,${dia}${mes}${anio}.xlsx`;
+
+    // 4. Escribir archivo
+    XLSX.writeFile(wb, nombreFinal);
+  }}
+  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+>
+  <Download className="w-5 h-5" />
+  EXPORTAR EXCEL
+</button>
       </div>
 
       {/* Tabla de comparación */}

@@ -8,98 +8,70 @@ export interface Product {
 }
 
 export function useProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchProducts = async () => {
+  // 1. Cargar productos desde el disco al iniciar
+  const [products, setProducts] = useState<Product[]>(() => {
+    const saved = localStorage.getItem('db_productos_fijos');
     try {
-      const response = await fetch('/api/products');
-      const data = await response.json();
-      setProducts(data);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  
+  const [loading, setLoading] = useState(false);
+
+  // 2. Guardar automáticamente cada vez que la lista cambie
+  useEffect(() => {
+    localStorage.setItem('db_productos_fijos', JSON.stringify(products));
+  }, [products]);
+
+  // Agregar producto individual (se suma a la lista)
+  const addProduct = async (product: Omit<Product, 'id'>) => {
+    const newProduct = {
+      ...product,
+      id: Date.now()
+    };
+    setProducts(prev => [...prev, newProduct]);
+    return true;
+  };
+
+  const deleteProduct = async (id: number) => {
+    setProducts(prev => prev.filter(p => p.id !== id));
+  };
+
+  const deleteAllProducts = async () => {
+    if (confirm('¿Eliminar TODOS los productos cargados?')) {
+      setProducts([]);
+    }
+  };
+
+  // IMPORTACIÓN MASIVA: Aquí es donde se SUMAN los productos
+  const bulkImportProducts = async (productsData: Array<{ ean: string; code: string; description: string }>) => {
+    try {
+      setLoading(true);
+      
+      const newFormattedProducts = productsData.map((p, index) => ({
+        ...p,
+        id: Date.now() + index // ID único para evitar conflictos
+      }));
+
+      // USAMOS EL OPERADOR SPREAD (...) PARA SUMAR:
+      // [...anteriores, ...nuevos]
+      setProducts(prevProducts => [...prevProducts, ...newFormattedProducts]);
+      
+      return true;
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error(error);
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const addProduct = async (product: Omit<Product, 'id'>) => {
-    try {
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(product),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error al agregar producto');
-      }
-      
-      await fetchProducts();
-      return true;
-    } catch (error: any) {
-      alert(error.message);
-      return false;
-    }
-  };
-
-  const deleteProduct = async (id: number) => {
-    try {
-      await fetch(`/api/products/${id}`, { method: 'DELETE' });
-      await fetchProducts();
-    } catch (error) {
-      console.error('Error deleting product:', error);
-    }
-  };
-
-  const deleteAllProducts = async () => {
-    if (!confirm('¿Está seguro de eliminar TODOS los productos?')) {
-      return;
-    }
-    
-    try {
-      await fetch('/api/products', { method: 'DELETE' });
-      await fetchProducts();
-    } catch (error) {
-      console.error('Error deleting all products:', error);
-    }
-  };
-
-  const bulkImportProducts = async (productsData: Array<{ ean: string; code: string; description: string }>) => {
-    try {
-      const response = await fetch('/api/products/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productsData),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al importar productos');
-      }
-      
-      await fetchProducts();
-      return true;
-    } catch (error: any) {
-      alert(error.message);
-      return false;
-    }
-  };
-
   const findProductByEan = async (ean: string): Promise<Product | null> => {
-    try {
-      const response = await fetch(`/api/products/by-ean/${encodeURIComponent(ean)}`);
-      if (!response.ok) {
-        return null;
-      }
-      return await response.json();
-    } catch (error) {
-      return null;
-    }
+    // Busca en la lista local que ya tenemos cargada
+    const found = products.find(p => p.ean === ean);
+    return found || null;
   };
 
   return {
@@ -110,6 +82,6 @@ export function useProducts() {
     deleteAllProducts,
     bulkImportProducts,
     findProductByEan,
-    refetch: fetchProducts,
+    refetch: () => {}, // Ya no es necesario porque es local
   };
 }
