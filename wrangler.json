@@ -1,27 +1,18 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "019c1e84-54ba-7ec1-af2e-e8bac212014a",
-  "main": "./src/worker/index.ts",
+  "name": "sistema-inventario-pintu",
+  "main": "src/worker/index.ts",
   "compatibility_date": "2025-06-17",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": {
-    "enabled": true
-  },
-  "upload_source_maps": true,
   "assets": {
+    "directory": "./dist/client",
     "not_found_handling": "single-page-application"
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "019c1e84-54ba-7ec1-af2e-e8bac212014a",
-      "database_id": "019c1e84-54ba-7ec1-af2e-e8bac212014a"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "R2_BUCKET",
-      "bucket_name": "019c1e84-54ba-7ec1-af2e-e8bac212014a"
+      "database_name": "pintu-db-prod",
+      "database_id": "5c478fcf-4ecc-4440-b5a9-1e7f412735d0"
     }
   ]
 }
