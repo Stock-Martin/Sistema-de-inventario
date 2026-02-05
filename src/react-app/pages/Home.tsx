@@ -15,70 +15,75 @@ export default function Home() {
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0e27] via-[#1a1147] to-[#2d1b69] text-white">
-      {/* Navegación de pestañas */}
-      <div className="bg-gradient-to-r from-[#1a1f3a] to-[#0f1229] border-b-2 border-cyan-500/30">
-        <div className="max-w-[1800px] mx-auto px-4">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('inventario')}
-              className={`flex items-center gap-3 px-8 py-4 font-bold transition-all relative ${
-                activeTab === 'inventario'
-                  ? 'text-cyan-400 bg-gradient-to-br from-[#1a1f3a] to-[#0f1229]'
-                  : 'text-cyan-600 hover:text-cyan-400'
-              }`}
-            >
-              <Package className="w-6 h-6" />
-              <span>INVENTARIO</span>
-              {activeTab === 'inventario' && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('tintometrico')}
-              className={`flex items-center gap-3 px-8 py-4 font-bold transition-all relative ${
-                activeTab === 'tintometrico'
-                  ? 'text-cyan-400 bg-gradient-to-br from-[#1a1f3a] to-[#0f1229]'
-                  : 'text-cyan-600 hover:text-cyan-400'
-              }`}
-            >
-              <Droplet className="w-6 h-6" />
-              <span>TINTOMÉTRICO</span>
-              {activeTab === 'tintometrico' && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('productos')}
-              className={`flex items-center gap-3 px-8 py-4 font-bold transition-all relative ${
-                activeTab === 'productos'
-                  ? 'text-cyan-400 bg-gradient-to-br from-[#1a1f3a] to-[#0f1229]'
-                  : 'text-cyan-600 hover:text-cyan-400'
-              }`}
-            >
-              <Database className="w-6 h-6" />
-              <span>PRODUCTOS</span>
-              {activeTab === 'productos' && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('stock')}
-              className={`flex items-center gap-3 px-8 py-4 font-bold transition-all relative ${
-                activeTab === 'stock'
-                  ? 'text-cyan-400 bg-gradient-to-br from-[#1a1f3a] to-[#0f1229]'
-                  : 'text-cyan-600 hover:text-cyan-400'
-              }`}
-            >
-              <Package className="w-6 h-6" />
-              <span>STOCK</span>
-              {activeTab === 'stock' && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
 
+    {/* Navegación de pestañas */}
+<div className="bg-gradient-to-r from-[#1a1f3a] to-[#0f1229] border-b-2 border-cyan-500/30">
+  <div className="max-w-[1800px] mx-auto px-2 py-2 md:px-4 md:py-0">
+    {/* Grid en móvil (2x2), Flex en PC */}
+    <div className="grid grid-cols-2 md:flex md:flex-row gap-2 md:gap-0">
+      <button
+        onClick={() => setActiveTab('inventario')}
+        className={`flex items-center justify-center md:justify-start gap-3 px-4 md:px-8 py-3 md:py-4 font-bold transition-all relative rounded-lg md:rounded-none ${
+          activeTab === 'inventario'
+            ? 'text-cyan-400 bg-cyan-500/10 md:bg-gradient-to-br md:from-[#1a1f3a] md:to-[#0f1229] border border-cyan-500/50 md:border-none'
+            : 'text-cyan-600 hover:text-cyan-400 border border-transparent'
+        }`}
+      >
+        <Package className="w-5 h-5" />
+        <span className="text-sm">INVENTARIO</span>
+        {/* Línea decorativa solo en PC */}
+        {activeTab === 'inventario' && (
+          <div className="hidden md:block absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+        )}
+      </button>
+
+      <button
+        onClick={() => setActiveTab('tintometrico')}
+        className={`flex items-center justify-center md:justify-start gap-3 px-4 md:px-8 py-3 md:py-4 font-bold transition-all relative rounded-lg md:rounded-none ${
+          activeTab === 'tintometrico'
+            ? 'text-cyan-400 bg-cyan-500/10 md:bg-gradient-to-br md:from-[#1a1f3a] md:to-[#0f1229] border border-cyan-500/50 md:border-none'
+            : 'text-cyan-600 hover:text-cyan-400 border border-transparent'
+        }`}
+      >
+        <Droplet className="w-5 h-5" />
+        <span className="text-sm">TINTOMÉTRICO</span>
+        {activeTab === 'tintometrico' && (
+          <div className="hidden md:block absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+        )}
+      </button>
+
+      <button
+        onClick={() => setActiveTab('productos')}
+        className={`flex items-center justify-center md:justify-start gap-3 px-4 md:px-8 py-3 md:py-4 font-bold transition-all relative rounded-lg md:rounded-none ${
+          activeTab === 'productos'
+            ? 'text-cyan-400 bg-cyan-500/10 md:bg-gradient-to-br md:from-[#1a1f3a] md:to-[#0f1229] border border-cyan-500/50 md:border-none'
+            : 'text-cyan-600 hover:text-cyan-400 border border-transparent'
+        }`}
+      >
+        <Database className="w-5 h-5" />
+        <span className="text-sm">PRODUCTOS</span>
+        {activeTab === 'productos' && (
+          <div className="hidden md:block absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+        )}
+      </button>
+
+      <button
+        onClick={() => setActiveTab('stock')}
+        className={`flex items-center justify-center md:justify-start gap-3 px-4 md:px-8 py-3 md:py-4 font-bold transition-all relative rounded-lg md:rounded-none ${
+          activeTab === 'stock'
+            ? 'text-cyan-400 bg-cyan-500/10 md:bg-gradient-to-br md:from-[#1a1f3a] md:to-[#0f1229] border border-cyan-500/50 md:border-none'
+            : 'text-cyan-600 hover:text-cyan-400 border border-transparent'
+        }`}
+      >
+        <Package className="w-5 h-5" />
+        <span className="text-sm">STOCK</span>
+        {activeTab === 'stock' && (
+          <div className="hidden md:block absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+        )}
+      </button>
+    </div>
+  </div>
+</div>
       {/* Contenido de las pestañas */}
       <div className="p-4 md:p-8">
         <div className="max-w-[1200px] mx-auto">
