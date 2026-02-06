@@ -626,7 +626,7 @@ function StockTab() {
               <div className="text-center text-purple-300 font-bold">{record.system_quantity}</div>
              <div className={`text-center font-bold ${(record.difference ?? 0) > 0 ? 'text-yellow-400' : (record.difference ?? 0) < 0 ? 'text-red-400' : 'text-green-400'}`}>
   {record.difference ?? 0}
-</div>
+</div>    
               <div className="text-center"><span className="px-2 py-1 rounded bg-purple-500/30 text-purple-300 font-bold">{record.status}</span></div>
             </div>
           ))}
