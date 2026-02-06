@@ -8,6 +8,7 @@ type Env = {
 
 const app = new Hono<{ Bindings: Env }>();
 
+// Mantenemos el esquema original para no chocar con la base de datos actual
 const inventoryRecordSchema = z.object({
   marbete_number: z.string().min(1),
   product_id: z.number(),
@@ -15,15 +16,15 @@ const inventoryRecordSchema = z.object({
   quantity: z.number().min(0),
 });
 
-// Get records by marbete
+// GET: Aquí recuperamos el Código y Descripción uniendo las tablas
 app.get('/marbete/:marbete', async (c) => {
   const marbete = c.req.param('marbete');
   
   const { results } = await c.env.DB.prepare(`
     SELECT 
-      ir.*,
-      p.code,
-      p.description
+      ir.*, 
+      p.code, 
+      p.description 
     FROM inventory_records ir
     LEFT JOIN products p ON ir.product_id = p.id
     WHERE ir.marbete_number = ?
@@ -33,7 +34,7 @@ app.get('/marbete/:marbete', async (c) => {
   return c.json(results);
 });
 
-// Create inventory record
+// POST: Insertar solo lo que la tabla permite
 app.post('/', zValidator('json', inventoryRecordSchema), async (c) => {
   const data = c.req.valid('json');
   
@@ -50,26 +51,22 @@ app.post('/', zValidator('json', inventoryRecordSchema), async (c) => {
   return c.json({ id: result.meta.last_row_id, ...data });
 });
 
-// Update inventory record
+// Update
 app.put('/:id', async (c) => {
   const id = c.req.param('id');
   const { quantity } = await c.req.json();
-  
-  await c.env.DB.prepare(
-    'UPDATE inventory_records SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-  ).bind(quantity, id).run();
-  
+  await c.env.DB.prepare('UPDATE inventory_records SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(quantity, id).run();
   return c.json({ success: true });
 });
 
-// Delete inventory record
+// Delete
 app.delete('/:id', async (c) => {
   const id = c.req.param('id');
   await c.env.DB.prepare('DELETE FROM inventory_records WHERE id = ?').bind(id).run();
   return c.json({ success: true });
 });
 
-// Delete all records for a marbete
+// Delete all marbete
 app.delete('/marbete/:marbete', async (c) => {
   const marbete = c.req.param('marbete');
   await c.env.DB.prepare('DELETE FROM inventory_records WHERE marbete_number = ?').bind(marbete).run();

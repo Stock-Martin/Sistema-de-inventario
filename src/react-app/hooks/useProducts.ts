@@ -50,10 +50,12 @@ export function useProducts() {
     try {
       setLoading(true);
       
-      const newFormattedProducts = productsData.map((p, index) => ({
-        ...p,
-        id: Date.now() + index // ID único para evitar conflictos
-      }));
+const newFormattedProducts = productsData.map((p, index) => ({
+  ean: String(p.ean || "").trim().toUpperCase(),
+  code: String(p.code || "").trim().toUpperCase(),
+  description: String(p.description || "").trim(), // La descripción la dejamos normal
+  id: Date.now() + index
+}));
 
       // USAMOS EL OPERADOR SPREAD (...) PARA SUMAR:
       // [...anteriores, ...nuevos]
@@ -68,11 +70,24 @@ export function useProducts() {
     }
   };
 
-  const findProductByEan = async (ean: string): Promise<Product | null> => {
-    // Busca en la lista local que ya tenemos cargada
-    const found = products.find(p => p.ean === ean);
-    return found || null;
-  };
+const findProductByEan = async (searchValue: string): Promise<Product | null> => {
+  // 1. Limpiamos el valor de búsqueda y lo pasamos a MAYÚSCULAS
+  const term = searchValue.trim().toUpperCase();
+
+  if (!term) return null;
+
+  // 2. Buscamos en la lista local
+  const found = products.find(p => {
+    // Normalizamos los datos de la "base de datos" para comparar manzanas con manzanas
+    const prodEan = (p.ean || "").trim().toUpperCase();
+    const prodCode = (p.code || "").trim().toUpperCase();
+
+    // Verificamos si coincide con el EAN O con el Código de Artículo
+    return prodEan === term || prodCode === term;
+  });
+
+  return found || null;
+};
 
   return {
     products,

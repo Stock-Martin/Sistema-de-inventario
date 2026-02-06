@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+  import { useState, useRef } from 'react';
 import { Package, Droplet, Database, Download, Trash2, Plus, Search, Edit2, X } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { useInventory } from '../hooks/useInventory';
@@ -107,84 +107,69 @@ function InventarioTab() {
   const { findProductByEan } = useProducts();
   const { records, addRecord, updateRecord, deleteRecord, clearAll } = useInventory(marbeteNumber);
 
-  const handleSkuChange = async (value: string) => {
-    let cleanedValue = value.replace(/[\r\n\t]/g, '').trim();
+const handleSkuChange = async (value: string) => {
+  // 1. Limpieza profunda y normalización a MAYÚSCULAS
+  let cleanedValue = value.replace(/[\r\n\t]/g, '').trim().toUpperCase();
+  
+  // 2. Manejo de notación científica (Excel)
+  if (cleanedValue.includes('E+')) {
+    try {
+      const num = parseFloat(cleanedValue);
+      if (!isNaN(num)) cleanedValue = num.toFixed(0);
+    } catch (e) { console.error(e); }
+  }
+  
+  // Actualizamos el estado con el valor limpio
+  setSku(cleanedValue);
+  
+  if (!cleanedValue) {
+    setFoundProduct(null);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    return;
+  }
+  
+  if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+  
+  searchTimeoutRef.current = setTimeout(async () => {
+    // Buscamos el producto. 
+    // IMPORTANTE: findProductByEan debe recibir el valor en mayúsculas
+    const product = await findProductByEan(cleanedValue);
     
-    // Convertir notación científica a número normal si es necesario
-    // Ejemplo: "7.790715001661E+12" → "7790715001661"
-    if (cleanedValue.toLowerCase().includes('e+') || cleanedValue.toLowerCase().includes('e-')) {
-      try {
-        const num = parseFloat(cleanedValue);
-        if (!isNaN(num)) {
-          cleanedValue = num.toFixed(0); // Convertir a entero sin decimales
-          console.log('Inv - Convertido de notación científica:', value, '→', cleanedValue);
-        }
-      } catch (e) {
-        console.error('Inv - Error al convertir notación científica:', e);
-      }
-    }
-    
-    // Limpiar caracteres especiales finales
-    cleanedValue = cleanedValue.replace(/[^\w-]/g, '').trim();
-    
-    setSku(cleanedValue);
-    
-    if (!cleanedValue) {
+    if (product) {
+      setFoundProduct(product);
+      setTimeout(() => {
+        quantityInputRef.current?.focus();
+        quantityInputRef.current?.select();
+      }, 150);
+    } else {
       setFoundProduct(null);
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      return;
     }
-    
-    console.log('Inv - Código original:', JSON.stringify(value));
-    console.log('Inv - Código procesado:', cleanedValue, 'Longitud:', cleanedValue.length);
-    
-    // Clear previous search timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    // Buscar producto después de un breve delay (esperar a que termine de escribir/escanear)
-    searchTimeoutRef.current = setTimeout(async () => {
-      const product = await findProductByEan(cleanedValue);
-      if (product) {
-        console.log('Inv - ✓ Producto encontrado:', product);
-        setFoundProduct(product);
-        // Auto-focus en cantidad cuando se encuentra el producto
-        setTimeout(() => {
-          quantityInputRef.current?.focus();
-          quantityInputRef.current?.select();
-        }, 150);
-      } else {
-        console.log('Inv - ✗ Producto NO encontrado');
-        setFoundProduct(null);
-      }
-    }, 300);
-  };
+  }, 300);
+};
 
-  const handleQuantitySubmit = async () => {
-    if (!sku.trim() || !quantity.trim()) return;
-    
-    if (!foundProduct) {
-      alert('Producto no encontrado. Por favor, cargue el producto primero en la pestaña PRODUCTOS.');
-      return;
-    }
-    
-    const success = await addRecord({
-      marbete_number: marbeteNumber,
-      product_id: foundProduct.id,
-      ean: sku,
-      quantity: parseInt(quantity),
-    });
-    
-    if (success) {
-      setSku('');
-      setQuantity('');
-      setFoundProduct(null);
-      skuInputRef.current?.focus();
-    }
-  };
+const handleQuantitySubmit = async () => {
+  // Verificamos que tengamos los datos necesarios
+  if (!sku.trim() || !quantity.trim() || !foundProduct) {
+    alert("Primero debes encontrar un producto válido");
+    return;
+  }
+
+  const success = await addRecord({
+    marbete_number: marbeteNumber,
+    product_id: foundProduct.id,
+    ean: foundProduct.ean || sku, 
+    code: foundProduct.code,         // Usamos directamente lo que encontramos
+    description: foundProduct.description, 
+    quantity: parseInt(quantity),
+  });
+
+  if (success) {
+    setSku('');
+    setQuantity('');
+    setFoundProduct(null); // Limpiamos para el próximo escaneo
+    skuInputRef.current?.focus();
+  }
+};
 
   const handleChangeMarbete = () => {
     setTempMarbete(marbeteNumber);
@@ -208,7 +193,6 @@ function InventarioTab() {
         </div>
       </div>
 
-      {/* Número de Marbete */}
       <div className="mb-6">
         <label className="text-cyan-300 text-sm mb-2 block">✦ NÚMERO DE MARBETE</label>
         <div className="bg-[#0a0e27] rounded-lg p-6 md:p-8 border-2 border-purple-500/30">
@@ -221,28 +205,15 @@ function InventarioTab() {
                 className="text-4xl md:text-6xl font-bold text-center text-purple-300 tracking-widest bg-transparent border-b-2 border-purple-500 focus:outline-none w-64"
                 autoFocus
               />
-              <button
-                onClick={handleSaveMarbete}
-                className="bg-green-600 hover:bg-green-500 text-white p-2 rounded"
-              >
-                ✓
-              </button>
-              <button
-                onClick={() => setEditingMarbete(false)}
-                className="bg-red-600 hover:bg-red-500 text-white p-2 rounded"
-              >
-                ✕
-              </button>
+              <button onClick={handleSaveMarbete} className="bg-green-600 hover:bg-green-500 text-white p-2 rounded">✓</button>
+              <button onClick={() => setEditingMarbete(false)} className="bg-red-600 hover:bg-red-500 text-white p-2 rounded">✕</button>
             </div>
           ) : (
-            <div className="text-5xl md:text-7xl font-bold text-center text-purple-300 tracking-widest">
-              {marbeteNumber}
-            </div>
+            <div className="text-5xl md:text-7xl font-bold text-center text-purple-300 tracking-widest">{marbeteNumber}</div>
           )}
         </div>
       </div>
 
-      {/* SKU / Código de Barra */}
       <div className="mb-6">
         <label className="text-cyan-300 text-sm mb-2 block">CÓDIGO DE ARTÍCULO O CÓDIGO DE BARRA</label>
         <input
@@ -254,31 +225,18 @@ function InventarioTab() {
             if (e.key === 'Enter' && foundProduct) {
               e.preventDefault();
               quantityInputRef.current?.focus();
-              quantityInputRef.current?.select();
             }
           }}
           placeholder="Escanea o ingresa el código..."
-          className="w-full bg-[#0a0e27] border-2 border-cyan-500/50 rounded-lg px-4 py-3 text-cyan-300 placeholder-cyan-700 focus:outline-none focus:border-cyan-400 transition-all text-lg"
+          className="w-full bg-[#0a0e27] border-2 border-cyan-500/50 rounded-lg px-4 py-3 text-cyan-300 text-lg"
         />
         {sku && !foundProduct && (
-          <div className="mt-3 bg-red-900/40 border-2 border-red-500 rounded-lg p-4 text-center">
-            <div className="text-red-300 font-bold text-lg mb-2">⚠ PRODUCTO NO ENCONTRADO</div>
-            <div className="text-red-400 text-sm">
-              Código escaneado: <span className="font-mono font-bold">"{sku}"</span>
-            </div>
-            <div className="text-red-400/70 text-xs mt-1">
-              Por favor, verifique el código o cargue el producto en la pestaña PRODUCTOS
-            </div>
-          </div>
-        )}
-        {foundProduct && (
-          <div className="mt-3 bg-green-900/40 border-2 border-green-500 rounded-lg p-3 text-center">
-            <div className="text-green-300 font-bold">✓ PRODUCTO ENCONTRADO</div>
+          <div className="mt-3 bg-red-900/40 border-2 border-red-500 rounded-lg p-4 text-center text-red-300">
+            ⚠ PRODUCTO NO ENCONTRADO
           </div>
         )}
       </div>
 
-      {/* Descripción del Producto */}
       {foundProduct && (
         <div className="mb-6">
           <label className="text-purple-300 text-sm mb-2 block">DESCRIPCIÓN DEL PRODUCTO</label>
@@ -288,7 +246,6 @@ function InventarioTab() {
         </div>
       )}
 
-      {/* Cantidad */}
       <div className="mb-6">
         <label className="text-cyan-300 text-sm mb-2 block">CANTIDAD</label>
         <input
@@ -296,73 +253,35 @@ function InventarioTab() {
           type="number"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleQuantitySubmit();
-            }
-          }}
+          onKeyDown={(e) => e.key === 'Enter' && handleQuantitySubmit()}
           placeholder="0"
-          className="w-full bg-[#0a0e27] border-2 border-purple-500/50 rounded-lg px-4 py-3 text-purple-300 placeholder-purple-700 focus:outline-none focus:border-purple-400 transition-all text-center text-3xl md:text-4xl font-bold"
+          className="w-full bg-[#0a0e27] border-2 border-purple-500/50 rounded-lg px-4 py-3 text-purple-300 text-center text-3xl font-bold"
         />
       </div>
 
-      {/* Botones de acción */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-        <button
-          onClick={handleQuantitySubmit}
-          className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          INGRESAR DATOS
-        </button>
-        <button
-          onClick={() => {
-            setSku('');
-            setFoundProduct(null);
-          }}
-          className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          BORRAR CÓDIGO
-        </button>
-        <button
-          onClick={() => setQuantity('')}
-          className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          BORRAR CANT.
-        </button>
-        <button
-          onClick={handleChangeMarbete}
-          className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          CAMBIAR MARBETE
-        </button>
+        <button onClick={handleQuantitySubmit} className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-bold py-4 rounded-lg">INGRESAR DATOS</button>
+        <button onClick={() => { setSku(''); setFoundProduct(null); }} className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-bold py-4 rounded-lg">BORRAR CÓDIGO</button>
+        <button onClick={() => setQuantity('')} className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-bold py-4 rounded-lg">BORRAR CANT.</button>
+        <button onClick={handleChangeMarbete} className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold py-4 rounded-lg">CAMBIAR MARBETE</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-        <button
-          onClick={clearAll}
-          className="bg-gradient-to-r from-pink-600 to-red-600 hover:from-pink-500 hover:to-red-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          LIMPIAR TODO
-        </button>
+        <button onClick={clearAll} className="bg-gradient-to-r from-pink-600 to-red-600 text-white font-bold py-4 rounded-lg">LIMPIAR TODO</button>
         <button
           onClick={() => {
             const wb = XLSX.utils.book_new();
-            const wsData = [
-              ['NUMERO DE MARBETE', 'EAN', 'CODIGO', 'DESCRIPCION', 'CANTIDAD'],
-              ...records.map(r => [r.marbete_number || marbeteNumber, r.ean, r.code, r.description, r.quantity])
-            ];
+            const wsData = [['MARBETE', 'EAN', 'CODIGO', 'DESCRIPCION', 'CANTIDAD'], ...records.map(r => [r.marbete_number || marbeteNumber, r.ean, r.code, r.description, r.quantity])];
             const ws = XLSX.utils.aoa_to_sheet(wsData);
             XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
             XLSX.writeFile(wb, `inventario_marbete_${marbeteNumber}.xlsx`);
           }}
-          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+          className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2"
         >
-          <Download className="w-5 h-5" />
-          EXPORTAR EXCEL
+          <Download className="w-5 h-5" /> EXPORTAR EXCEL
         </button>
       </div>
 
-      {/* Detalle de registros */}
       <RecordsTable records={records} onUpdate={updateRecord} onDelete={deleteRecord} />
     </div>
   );
@@ -374,8 +293,6 @@ function TintometricoTab() {
   const [quantity, setQuantity] = useState('');
   const [foundProduct, setFoundProduct] = useState<any>(null);
 
-  const [status, setStatus] = useState<'success' | 'error' | null>(null);
-
   const skuInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -383,74 +300,50 @@ function TintometricoTab() {
   const { findProductByEan } = useProducts();
   const { records, addRecord, updateRecord, deleteRecord, clearAll } = useTintometric(selectedSucursal);
 
-  const handleSkuChange = async (value: string) => {
-    let cleanedValue = value.replace(/[\r\n\t]/g, '').trim();
+const handleSkuChange = async (value: string) => {
+    // Normalizamos a MAYÚSCULAS y limpiamos caracteres del lector
+    let cleanedValue = value.replace(/[\r\n\t]/g, '').trim().toUpperCase();
     
-    // Convertir notación científica a número normal si es necesario
-    // Ejemplo: "7.790715001661E+12" → "7790715001661"
-    if (cleanedValue.toLowerCase().includes('e+') || cleanedValue.toLowerCase().includes('e-')) {
+    if (cleanedValue.includes('E+')) {
       try {
         const num = parseFloat(cleanedValue);
-        if (!isNaN(num)) {
-          cleanedValue = num.toFixed(0); // Convertir a entero sin decimales
-          console.log('Tinto - Convertido de notación científica:', value, '→', cleanedValue);
-        }
-      } catch (e) {
-        console.error('Tinto - Error al convertir notación científica:', e);
-      }
+        if (!isNaN(num)) cleanedValue = num.toFixed(0);
+      } catch (e) { console.error(e); }
     }
-    
-    // Limpiar caracteres especiales finales
-    cleanedValue = cleanedValue.replace(/[^\w-]/g, '').trim();
     
     setSku(cleanedValue);
     
     if (!cleanedValue) {
       setFoundProduct(null);
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
       return;
     }
     
-    console.log('Tinto - Código original:', JSON.stringify(value));
-    console.log('Tinto - Código procesado:', cleanedValue, 'Longitud:', cleanedValue.length);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     
-    // Clear previous search timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    // Buscar producto después de un breve delay (esperar a que termine de escribir/escanear)
     searchTimeoutRef.current = setTimeout(async () => {
-      const product = await findProductByEan(cleanedValue);
+      // Ahora la búsqueda es insensible a mayúsculas/minúsculas porque enviamos todo en UPCASE
+      const product = await findProductByEan(cleanedValue); 
+      
       if (product) {
-        console.log('Tinto - ✓ Producto encontrado:', product);
         setFoundProduct(product);
-        // Auto-focus en cantidad cuando se encuentra el producto
         setTimeout(() => {
           quantityInputRef.current?.focus();
           quantityInputRef.current?.select();
         }, 150);
       } else {
-        console.log('Tinto - ✗ Producto NO encontrado');
         setFoundProduct(null);
       }
     }, 300);
   };
 
   const handleQuantitySubmit = async () => {
-    if (!sku.trim() || !quantity.trim()) return;
-    
-    if (!foundProduct) {
-      alert('Producto no encontrado. Por favor, cargue el producto primero en la pestaña PRODUCTOS.');
-      return;
-    }
-    
+    if (!sku.trim() || !quantity.trim() || !foundProduct) return;
     const success = await addRecord({
       sucursal: selectedSucursal,
       product_id: foundProduct.id,
-      ean: sku,
+      ean: foundProduct.ean || sku, 
+      code: foundProduct.code,
+      description: foundProduct.description,
       quantity: parseInt(quantity),
     });
     
@@ -464,7 +357,6 @@ function TintometricoTab() {
 
   return (
     <div className="bg-gradient-to-br from-[#1a1f3a] to-[#0f1229] rounded-2xl border-2 border-cyan-500/30 p-6 md:p-8 shadow-2xl">
-      {/* Seleccionar Sucursal */}
       <div className="mb-8">
         <h3 className="text-purple-300 text-sm mb-4 text-center font-bold">SELECCIONAR SUCURSAL</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -472,10 +364,10 @@ function TintometricoTab() {
             <button
               key={sucursal}
               onClick={() => setSelectedSucursal(sucursal)}
-              className={`py-4 px-3 rounded-lg font-bold text-sm transition-all transform hover:scale-105 ${
+              className={`py-4 px-3 rounded-lg font-bold text-sm transition-all ${
                 selectedSucursal === sucursal
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/50'
-                  : 'bg-purple-900/40 border-2 border-purple-500/30 text-purple-300 hover:border-purple-400'
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg'
+                  : 'bg-purple-900/40 border-2 border-purple-500/30 text-purple-300'
               }`}
             >
               {sucursal}
@@ -492,7 +384,6 @@ function TintometricoTab() {
         </div>
       </div>
 
-      {/* SKU / Código de Barra */}
       <div className="mb-6">
         <label className="text-cyan-300 text-sm mb-2 block">CÓDIGO DE ARTÍCULO O CÓDIGO DE BARRA</label>
         <input
@@ -504,31 +395,13 @@ function TintometricoTab() {
             if (e.key === 'Enter' && foundProduct) {
               e.preventDefault();
               quantityInputRef.current?.focus();
-              quantityInputRef.current?.select();
             }
           }}
           placeholder="Escanea o ingresa el código..."
-          className="w-full bg-[#0a0e27] border-2 border-cyan-500/50 rounded-lg px-4 py-3 text-cyan-300 placeholder-cyan-700 focus:outline-none focus:border-cyan-400 transition-all text-lg"
+          className="w-full bg-[#0a0e27] border-2 border-cyan-500/50 rounded-lg px-4 py-3 text-cyan-300 text-lg"
         />
-        {sku && !foundProduct && (
-          <div className="mt-3 bg-red-900/40 border-2 border-red-500 rounded-lg p-4 text-center">
-            <div className="text-red-300 font-bold text-lg mb-2">⚠ PRODUCTO NO ENCONTRADO</div>
-            <div className="text-red-400 text-sm">
-              Código escaneado: <span className="font-mono font-bold">"{sku}"</span>
-            </div>
-            <div className="text-red-400/70 text-xs mt-1">
-              Por favor, verifique el código o cargue el producto en la pestaña PRODUCTOS
-            </div>
-          </div>
-        )}
-        {foundProduct && (
-          <div className="mt-3 bg-green-900/40 border-2 border-green-500 rounded-lg p-3 text-center">
-            <div className="text-green-300 font-bold">✓ PRODUCTO ENCONTRADO</div>
-          </div>
-        )}
       </div>
 
-      {/* Descripción del Producto */}
       {foundProduct && (
         <div className="mb-6">
           <label className="text-purple-300 text-sm mb-2 block">DESCRIPCIÓN DEL PRODUCTO</label>
@@ -538,7 +411,6 @@ function TintometricoTab() {
         </div>
       )}
 
-      {/* Cantidad */}
       <div className="mb-6">
         <label className="text-cyan-300 text-sm mb-2 block">CANTIDAD O BASE B.H.A</label>
         <input
@@ -546,49 +418,20 @@ function TintometricoTab() {
           type="number"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleQuantitySubmit();
-            }
-          }}
+          onKeyDown={(e) => e.key === 'Enter' && handleQuantitySubmit()}
           placeholder="0"
-          className="w-full bg-[#0a0e27] border-2 border-purple-500/50 rounded-lg px-4 py-3 text-purple-300 placeholder-purple-700 focus:outline-none focus:border-purple-400 transition-all text-center text-3xl md:text-4xl font-bold"
+          className="w-full bg-[#0a0e27] border-2 border-purple-500/50 rounded-lg px-4 py-3 text-purple-300 text-center text-3xl font-bold"
         />
       </div>
 
-      {/* Botones de acción */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-        <button
-          onClick={handleQuantitySubmit}
-          className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          INGRESAR BAJA
-        </button>
-        <button
-          onClick={() => {
-            setSku('');
-            setFoundProduct(null);
-          }}
-          className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          BORRAR CÓDIGO
-        </button>
-        <button
-          onClick={() => setQuantity('')}
-          className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          BORRAR CANT.
-        </button>
+        <button onClick={handleQuantitySubmit} className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-bold py-4 rounded-lg">INGRESAR BAJA</button>
+        <button onClick={() => { setSku(''); setFoundProduct(null); }} className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-bold py-4 rounded-lg">BORRAR CÓDIGO</button>
+        <button onClick={() => setQuantity('')} className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-bold py-4 rounded-lg">BORRAR CANT.</button>
       </div>
 
-      <button
-        onClick={clearAll}
-        className="w-full bg-gradient-to-r from-pink-600 to-red-600 hover:from-pink-500 hover:to-red-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg mb-6"
-      >
-        LIMPIAR TODO
-      </button>
+      <button onClick={clearAll} className="w-full bg-gradient-to-r from-pink-600 to-red-600 text-white font-bold py-4 rounded-lg mb-6">LIMPIAR TODO</button>
 
-      {/* Registros de bajas */}
       <RecordsTable records={records} onUpdate={updateRecord} onDelete={deleteRecord} />
     </div>
   );
@@ -613,179 +456,68 @@ function ProductosTab() {
       alert('Por favor complete todos los campos');
       return;
     }
-    
     const success = await addProduct(newProduct);
-    if (success) {
-      setNewProduct({ ean: '', code: '', description: '' });
-    }
+    if (success) setNewProduct({ ean: '', code: '', description: '' });
   };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer);
-      
-      // Get the first sheet
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      
-      // Convert to JSON (array of arrays)
-      const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      
-      // Skip header row and map data
-      const productsData = data.slice(1)
-        .filter(row => row && row.length >= 3)
-        .map(row => {
-          const code = String(row[0] || '').trim();
-          const description = String(row[1] || '').trim();
-          const ean = String(row[2] || '').trim();
-          return { ean, code, description };
-        })
-        .filter(p => p.ean && p.code && p.description);
+      const data: any[][] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+      const productsData = data.slice(1).filter(row => row && row.length >= 3).map(row => ({
+        code: String(row[0] || '').trim(),
+        description: String(row[1] || '').trim(),
+        ean: String(row[2] || '').trim()
+      })).filter(p => p.ean && p.code && p.description);
 
-      if (productsData.length === 0) {
-        alert('No se encontraron productos válidos en el archivo');
-        return;
+      if (productsData.length > 0) {
+        await bulkImportProducts(productsData);
+        alert(`Importados ${productsData.length} productos`);
       }
-
-      const success = await bulkImportProducts(productsData);
-      if (success) {
-        alert(`Se importaron ${productsData.length} productos exitosamente`);
-      }
-    } catch (error) {
-      console.error('Import error:', error);
-      alert('Error al leer el archivo. Asegúrese de que sea un archivo Excel válido con las columnas correctas');
-    }
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    } catch (err) { alert('Error al importar'); }
   };
 
   return (
     <div className="bg-gradient-to-br from-[#1a1f3a] to-[#0f1229] rounded-2xl border-2 border-cyan-500/30 p-6 md:p-8 shadow-2xl">
       <div className="flex items-center gap-3 mb-6">
         <Database className="w-10 h-10 text-cyan-400" />
-        <div>
-          <h2 className="text-3xl font-bold text-cyan-400">PRODUCTOS</h2>
-          <p className="text-cyan-300/60 text-sm">✦ GESTIÓN DE CATÁLOGO</p>
-        </div>
+        <h2 className="text-3xl font-bold text-cyan-400">PRODUCTOS</h2>
       </div>
 
-      {/* Agregar Producto */}
-      <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 rounded-lg p-4 md:p-6 border-2 border-purple-500/30 mb-6">
-        <h3 className="text-purple-300 text-sm mb-4 font-bold">AGREGAR PRODUCTO</h3>
+      <div className="bg-purple-900/40 rounded-lg p-6 border-2 border-purple-500/30 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-          <input
-            type="text"
-            placeholder="CÓDIGO DE ARTÍCULO"
-            value={newProduct.code}
-            onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
-            className="bg-[#0a0e27] border border-purple-500/50 rounded px-4 py-3 text-purple-300 placeholder-purple-700 text-sm focus:outline-none focus:border-purple-400"
-          />
-          <input
-            type="text"
-            placeholder="DESCRIPCIÓN"
-            value={newProduct.description}
-            onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-            className="bg-[#0a0e27] border border-purple-500/50 rounded px-4 py-3 text-purple-300 placeholder-purple-700 text-sm focus:outline-none focus:border-purple-400"
-          />
-          <input
-            type="text"
-            placeholder="CÓDIGO DE BARRA"
-            value={newProduct.ean}
-            onChange={(e) => setNewProduct({ ...newProduct, ean: e.target.value })}
-            className="bg-[#0a0e27] border border-purple-500/50 rounded px-4 py-3 text-purple-300 placeholder-purple-700 text-sm focus:outline-none focus:border-purple-400"
-          />
+          <input type="text" placeholder="CÓDIGO ARTÍCULO" value={newProduct.code} onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })} className="bg-[#0a0e27] border border-purple-500 rounded px-4 py-3 text-purple-300" />
+          <input type="text" placeholder="DESCRIPCIÓN" value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} className="bg-[#0a0e27] border border-purple-500 rounded px-4 py-3 text-purple-300" />
+          <input type="text" placeholder="CÓDIGO BARRA" value={newProduct.ean} onChange={(e) => setNewProduct({ ...newProduct, ean: e.target.value })} className="bg-[#0a0e27] border border-purple-500 rounded px-4 py-3 text-purple-300" />
         </div>
-        <button
-          onClick={handleAddProduct}
-          className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg flex items-center justify-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          AGREGAR PRODUCTO
-        </button>
+        <button onClick={handleAddProduct} className="w-full bg-green-500 text-white font-bold py-4 rounded-lg">AGREGAR PRODUCTO</button>
       </div>
 
-      {/* Importación Masiva */}
-      <div className="bg-gradient-to-br from-pink-900/40 to-red-900/40 rounded-lg p-4 md:p-6 border-2 border-pink-500/30 mb-6">
-        <h3 className="text-pink-300 text-sm mb-4 font-bold">IMPORTACIÓN MASIVA</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button
-            onClick={deleteAllProducts}
-            className="bg-red-600 hover:bg-red-500 text-white px-4 py-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
-          >
-            <Trash2 className="w-4 h-4" />
-            ELIMINAR TODO
-          </button>
-          <label className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer">
-            <Download className="w-4 h-4" />
-            IMPORTAR EXCEL
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.tsv,.txt,.xls,.xlsx"
-              onChange={handleImportExcel}
-              className="hidden"
-            />
-          </label>
-        </div>
-        <p className="text-pink-300/60 text-xs mt-3">
-          * El archivo debe tener 3 columnas: CÓDIGO DE ARTÍCULO, DESCRIPCIÓN, CÓDIGO DE BARRA (separadas por comas o tabulaciones)
-        </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+        <button onClick={deleteAllProducts} className="bg-red-600 text-white py-3 rounded-lg font-bold">ELIMINAR TODO</button>
+        <label className="bg-purple-600 text-white py-3 rounded-lg font-bold text-center cursor-pointer">
+          IMPORTAR EXCEL <input type="file" onChange={handleImportExcel} className="hidden" />
+        </label>
       </div>
 
-      {/* Búsqueda */}
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-cyan-400 w-5 h-5" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="🔍 BUSCAR POR CUALQUIER CAMPO"
-            className="w-full bg-[#0a0e27] border-2 border-cyan-500/50 rounded-lg pl-10 pr-4 py-4 text-cyan-300 placeholder-cyan-700 focus:outline-none focus:border-cyan-400 transition-all"
-          />
-        </div>
-        <div className="text-right text-cyan-400 text-sm mt-2 font-semibold">
-          {filteredProducts.length} PRODUCTOS
-        </div>
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400" />
+        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="BUSCAR PRODUCTO..." className="w-full bg-[#0a0e27] border-2 border-cyan-500/50 rounded-lg pl-10 py-4 text-cyan-300" />
       </div>
 
-      {/* Lista de productos */}
-      <div className="bg-[#0a0e27]/50 rounded-lg p-4 max-h-[500px] overflow-x-auto overflow-y-auto">
+      <div className="bg-[#0a0e27]/50 rounded-lg p-4 max-h-[500px] overflow-auto">
         <div className="min-w-[800px]">
-          <div className="grid grid-cols-[200px_1fr_200px_80px] gap-4 text-sm mb-3">
-            <div className="text-cyan-400 font-bold">CÓDIGO DE ARTÍCULO</div>
-            <div className="text-cyan-400 font-bold">DESCRIPCIÓN</div>
-            <div className="text-cyan-400 font-bold">CÓDIGO DE BARRA</div>
-            <div className="text-cyan-400 font-bold text-center">ACCIONES</div>
-          </div>
-          
-          {filteredProducts.length === 0 ? (
-            <div className="text-center py-12 text-cyan-400/60">
-              No hay productos para mostrar
+          {filteredProducts.map((product) => (
+            <div key={product.id} className="grid grid-cols-[200px_1fr_200px_80px] gap-4 py-3 border-b border-purple-500/20">
+              <div className="text-cyan-300">{product.code}</div>
+              <div className="text-cyan-300">{product.description}</div>
+              <div className="text-cyan-300">{product.ean}</div>
+              <button onClick={() => deleteProduct(product.id)} className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
             </div>
-          ) : (
-            filteredProducts.map((product) => (
-              <div key={product.id} className="grid grid-cols-[200px_1fr_200px_80px] gap-4 text-sm py-3 border-t border-purple-500/20 hover:bg-purple-900/20 transition-all">
-                <div className="text-cyan-300">{product.code}</div>
-                <div className="text-cyan-300">{product.description}</div>
-                <div className="text-cyan-300">{product.ean}</div>
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => deleteProduct(product.id)}
-                    className="bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center transition-all transform hover:scale-110"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
+          ))}
         </div>
       </div>
     </div>
@@ -803,415 +535,144 @@ function StockTab() {
   const handleImportInventory = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer);
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      
+      const data: any[][] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
       const items = [];
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (!row || row.length < 5) continue;
-        
         const ean = String(row[1] || '').trim();
         const code = String(row[2] || '').trim();
         const description = String(row[3] || '').trim();
         const quantity = parseInt(String(row[4] || '0'));
-        
-        if (ean && code && description) {
+        if (ean && code) {
           const product = await findProductByEan(ean);
-          items.push({
-            product_id: product?.id || 0,
-            ean,
-            code,
-            description,
-            quantity
-          });
+          items.push({ product_id: product?.id || 0, ean, code, description, quantity });
         }
       }
-
-      if (items.length === 0) {
-        alert('No se encontraron items válidos en el archivo');
-        return;
-      }
-
-      const success = await importInventory(items);
-      if (success) {
-        alert(`Se importaron ${items.length} items del inventario`);
-      }
-    } catch (error) {
-      console.error('Import error:', error);
-      alert('Error al leer el archivo');
-    }
-    
-    if (fileInputRefInventory.current) {
-      fileInputRefInventory.current.value = '';
-    }
+      if (items.length > 0) await importInventory(items);
+    } catch (err) { alert('Error al importar'); }
   };
 
   const handleImportStock = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer);
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      
-      const items = data.slice(1)
-        .filter(row => row && row.length >= 3)
-        .map(row => ({
-          code: String(row[0] || '').trim(),
-          description: String(row[1] || '').trim(),
-          ean: String(row[2] || '').trim(),
-          quantity: parseInt(String(row[3] || '0'))
-        }))
-        .filter(item => item.ean || item.code);
-
-      if (items.length === 0) {
-        alert('No se encontraron items válidos en el archivo');
-        return;
-      }
-
-      const success = await importStock(items);
-      if (success) {
-        alert(`Se importaron ${items.length} items de stock`);
+      const data: any[][] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+      const items = data.slice(1).filter(row => row && row.length >= 3).map(row => ({
+        code: String(row[0] || '').trim(),
+        description: String(row[1] || '').trim(),
+        ean: String(row[2] || '').trim(),
+        quantity: parseInt(String(row[3] || '0'))
+      }));
+      if (items.length > 0) {
+        await importStock(items);
         await calculate();
       }
-    } catch (error) {
-      console.error('Import error:', error);
-      alert('Error al leer el archivo');
-    }
-    
-    if (fileInputRefStock.current) {
-      fileInputRefStock.current.value = '';
-    }
+    } catch (err) { alert('Error al importar'); }
   };
 
-  const filteredRecords = records.filter(r => {
-    if (filterStatus === 'ALL') return true;
-    return r.status === filterStatus;
-  });
-
-  const stats = {
-    total: records.length,
-    cruces: records.filter(r => r.status === 'CRUCE').length,
-    sobrantes: records.filter(r => r.status === 'SOBRANTE').length,
-    faltantes: records.filter(r => r.status === 'FALTANTE').length,
-  };
+  const filteredRecords = records.filter(r => filterStatus === 'ALL' || r.status === filterStatus);
 
   return (
     <div className="bg-gradient-to-br from-[#1a1f3a] to-[#0f1229] rounded-2xl border-2 border-cyan-500/30 p-6 md:p-8 shadow-2xl">
       <div className="flex items-center gap-3 mb-6">
         <Package className="w-10 h-10 text-cyan-400" />
-        <div>
-          <h2 className="text-3xl font-bold text-cyan-400">STOCK</h2>
-          <p className="text-cyan-300/60 text-sm">✦ COMPARACIÓN DE INVENTARIO</p>
-        </div>
+        <h2 className="text-3xl font-bold text-cyan-400">STOCK</h2>
       </div>
 
-      {/* Importaciones */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 rounded-lg p-6 border-2 border-purple-500/30">
-          <h3 className="text-purple-300 text-sm mb-3 font-bold">CARGA DE INVENTARIO</h3>
-          <p className="text-purple-300/60 text-xs mb-4">
-            Archivo Excel con columnas: MARBETE, EAN, CÓDIGO, DESCRIPCIÓN, CANTIDAD
-          </p>
-          <label className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer">
-            <Download className="w-4 h-4" />
-            IMPORTAR INVENTARIO
-            <input
-              ref={fileInputRefInventory}
-              type="file"
-              accept=".csv,.tsv,.txt,.xls,.xlsx"
-              onChange={handleImportInventory}
-              className="hidden"
-            />
+        <div className="bg-purple-900/40 p-6 border-2 border-purple-500/30 rounded-lg text-center">
+          <label className="cursor-pointer bg-purple-600 text-white px-4 py-3 rounded-lg font-bold block">
+            IMPORTAR INVENTARIO <input type="file" onChange={handleImportInventory} className="hidden" />
           </label>
         </div>
-
-        <div className="bg-gradient-to-br from-pink-900/40 to-red-900/40 rounded-lg p-6 border-2 border-pink-500/30">
-          <h3 className="text-pink-300 text-sm mb-3 font-bold">CARGA DE STOCK</h3>
-          <p className="text-pink-300/60 text-xs mb-4">
-            Archivo Excel con columnas: CÓDIGO, DESCRIPCIÓN, EAN, CANTIDAD
-          </p>
-          <label className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer">
-            <Download className="w-4 h-4" />
-            IMPORTAR STOCK
-            <input
-              ref={fileInputRefStock}
-              type="file"
-              accept=".csv,.tsv,.txt,.xls,.xlsx"
-              onChange={handleImportStock}
-              className="hidden"
-            />
+        <div className="bg-pink-900/40 p-6 border-2 border-pink-500/30 rounded-lg text-center">
+          <label className="cursor-pointer bg-pink-600 text-white px-4 py-3 rounded-lg font-bold block">
+            IMPORTAR STOCK <input type="file" onChange={handleImportStock} className="hidden" />
           </label>
         </div>
       </div>
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-cyan-900/40 border-2 border-cyan-500/30 rounded-lg p-4 text-center">
-          <div className="text-cyan-300 text-sm mb-1">TOTAL</div>
-          <div className="text-cyan-400 text-3xl font-bold">{stats.total}</div>
-        </div>
-        <div className="bg-green-900/40 border-2 border-green-500/30 rounded-lg p-4 text-center">
-          <div className="text-green-300 text-sm mb-1">CRUCES</div>
-          <div className="text-green-400 text-3xl font-bold">{stats.cruces}</div>
-        </div>
-        <div className="bg-yellow-900/40 border-2 border-yellow-500/30 rounded-lg p-4 text-center">
-          <div className="text-yellow-300 text-sm mb-1">SOBRANTES</div>
-          <div className="text-yellow-400 text-3xl font-bold">{stats.sobrantes}</div>
-        </div>
-        <div className="bg-red-900/40 border-2 border-red-500/30 rounded-lg p-4 text-center">
-          <div className="text-red-300 text-sm mb-1">FALTANTES</div>
-          <div className="text-red-400 text-3xl font-bold">{stats.faltantes}</div>
-        </div>
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {['ALL', 'CRUCE', 'SOBRANTE', 'FALTANTE'].map(s => (
+          <button key={s} onClick={() => setFilterStatus(s)} className={`px-4 py-2 rounded-lg font-bold ${filterStatus === s ? 'bg-cyan-500 text-white' : 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30'}`}>{s}</button>
+        ))}
       </div>
 
-      {/* Filtros */}
-      <div className="mb-6">
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setFilterStatus('ALL')}
-            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-              filterStatus === 'ALL'
-                ? 'bg-cyan-500 text-white'
-                : 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30'
-            }`}
-          >
-            TODOS
-          </button>
-          <button
-            onClick={() => setFilterStatus('CRUCE')}
-            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-              filterStatus === 'CRUCE'
-                ? 'bg-green-500 text-white'
-                : 'bg-green-900/40 text-green-300 border border-green-500/30'
-            }`}
-          >
-            CRUCES
-          </button>
-          <button
-            onClick={() => setFilterStatus('SOBRANTE')}
-            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-              filterStatus === 'SOBRANTE'
-                ? 'bg-yellow-500 text-white'
-                : 'bg-yellow-900/40 text-yellow-300 border border-yellow-500/30'
-            }`}
-          >
-            SOBRANTES
-          </button>
-          <button
-            onClick={() => setFilterStatus('FALTANTE')}
-            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-              filterStatus === 'FALTANTE'
-                ? 'bg-red-500 text-white'
-                : 'bg-red-900/40 text-red-300 border border-red-500/30'
-            }`}
-          >
-            FALTANTES
-          </button>
-        </div>
-      </div>
-
-      {/* Botones de acción */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-        <button
-          onClick={clearAll}
-          className="bg-gradient-to-r from-pink-600 to-red-600 hover:from-pink-500 hover:to-red-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg"
-        >
-          LIMPIAR TODO
-        </button>
-        <button
-  onClick={() => {
-    // 1. Crear el libro y la hoja
-    const wb = XLSX.utils.book_new();
-    const wsData = [
-      ['CODIGO', 'DESCRIPCION', 'EAN', 'CANTIDAD_CONTADA', 'CANTIDAD_SISTEMA', 'DIFERENCIA', 'ESTADO'],
-      ...filteredRecords.map(r => [
-        r.code,
-        r.description,
-        r.ean,
-        r.counted_quantity || 0,
-        r.system_quantity || 0,
-        r.difference || 0,
-        r.status || 'SIN_DATOS'
-      ])
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
-
-    // 2. Lógica de fecha DDMMAA (Ej: 050226)
-    const hoy = new Date();
-    const dia = String(hoy.getDate()).padStart(2, '0');
-    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-    const anio = String(hoy.getFullYear()).slice(-2);
-    
-    // 3. Nombre exacto: "inventario,DDMMAA.xlsx"
-    const nombreFinal = `inventario,${dia}${mes}${anio}.xlsx`;
-
-    // 4. Escribir archivo
-    XLSX.writeFile(wb, nombreFinal);
-  }}
-  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-4 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg flex items-center justify-center gap-2"
->
-  <Download className="w-5 h-5" />
-  EXPORTAR EXCEL
-</button>
+        <button onClick={clearAll} className="bg-red-600 text-white font-bold py-4 rounded-lg">LIMPIAR TODO</button>
+        <button onClick={() => {
+            const wb = XLSX.utils.book_new();
+            const wsData = [['CODIGO', 'DESCRIPCION', 'EAN', 'CONTADO', 'SISTEMA', 'DIFERENCIA', 'ESTADO'], ...filteredRecords.map(r => [r.code, r.description, r.ean, r.counted_quantity, r.system_quantity, r.difference, r.status])];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+            XLSX.writeFile(wb, 'comparacion_stock.xlsx');
+        }} className="bg-green-600 text-white font-bold py-4 rounded-lg">EXPORTAR EXCEL</button>
       </div>
 
-      {/* Tabla de comparación */}
-      <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 rounded-lg p-4 md:p-6 border-2 border-purple-500/30">
-        <h3 className="text-purple-300 font-bold text-lg mb-4">COMPARACIÓN DE STOCK</h3>
-        <div className="bg-[#0a0e27]/50 rounded-lg p-4 max-h-[500px] overflow-auto">
-          {filteredRecords.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Package className="w-20 h-20 text-purple-500/30 mb-4" />
-              <p className="text-purple-400/60 text-lg">NO HAY REGISTROS</p>
+      <div className="bg-[#0a0e27]/50 rounded-lg p-4 max-h-[500px] overflow-auto">
+        <div className="min-w-[900px]">
+          {filteredRecords.map((record, index) => (
+            <div key={index} className="grid grid-cols-[120px_1fr_120px_100px_100px_100px_120px] gap-3 py-2 border-b border-purple-500/10 text-xs items-center">
+              <div className="text-cyan-300 font-mono">{record.code}</div>
+              <div className="text-purple-100 truncate">{record.description}</div>
+              <div className="text-cyan-300">{record.ean}</div>
+              <div className="text-center text-purple-300 font-bold">{record.counted_quantity}</div>
+              <div className="text-center text-purple-300 font-bold">{record.system_quantity}</div>
+             <div className={`text-center font-bold ${(record.difference ?? 0) > 0 ? 'text-yellow-400' : (record.difference ?? 0) < 0 ? 'text-red-400' : 'text-green-400'}`}>
+  {record.difference ?? 0}
+</div>
+              <div className="text-center"><span className="px-2 py-1 rounded bg-purple-500/30 text-purple-300 font-bold">{record.status}</span></div>
             </div>
-          ) : (
-            <div className="min-w-[900px]">
-              <div className="grid grid-cols-[120px_1fr_120px_100px_100px_100px_120px] gap-3 text-xs mb-3 pb-2 border-b border-purple-500/30">
-                <div className="text-cyan-400 font-bold">CÓDIGO</div>
-                <div className="text-cyan-400 font-bold">DESCRIPCIÓN</div>
-                <div className="text-cyan-400 font-bold">EAN</div>
-                <div className="text-cyan-400 font-bold text-center">CONTADO</div>
-                <div className="text-cyan-400 font-bold text-center">SISTEMA</div>
-                <div className="text-cyan-400 font-bold text-center">DIFERENCIA</div>
-                <div className="text-cyan-400 font-bold text-center">ESTADO</div>
-              </div>
-              
-              {filteredRecords.map((record) => (
-                <div key={record.id} className="grid grid-cols-[120px_1fr_120px_100px_100px_100px_120px] gap-3 text-xs py-3 border-b border-purple-500/10 hover:bg-purple-900/20 transition-all">
-                  <div className="text-cyan-300">{record.code}</div>
-                  <div className="text-cyan-300">{record.description}</div>
-                  <div className="text-cyan-300">{record.ean}</div>
-                  <div className="text-center text-purple-300 font-bold">{record.counted_quantity || 0}</div>
-                  <div className="text-center text-purple-300 font-bold">{record.system_quantity || 0}</div>
-                  <div className={`text-center font-bold ${
-                    (record.difference || 0) > 0 ? 'text-yellow-400' :
-                    (record.difference || 0) < 0 ? 'text-red-400' :
-                    'text-green-400'
-                  }`}>
-                    {record.difference || 0}
-                  </div>
-                  <div className="text-center">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                      record.status === 'CRUCE' ? 'bg-green-500/30 text-green-300' :
-                      record.status === 'SOBRANTE' ? 'bg-yellow-500/30 text-yellow-300' :
-                      record.status === 'FALTANTE' ? 'bg-red-500/30 text-red-300' :
-                      'bg-gray-500/30 text-gray-300'
-                    }`}>
-                      {record.status || 'SIN_DATOS'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-function RecordsTable({
-  records,
-  onUpdate,
-  onDelete,
-}: {
-  records: any[];
-  onUpdate: (id: number, quantity: number) => void;
-  onDelete: (id: number) => void;
-}) {
+function RecordsTable({ records, onUpdate, onDelete }: { records: any[]; onUpdate: (id: number, q: number) => void; onDelete: (id: number) => void; }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editQuantity, setEditQuantity] = useState('');
 
-  const handleEdit = (record: any) => {
-    setEditingId(record.id);
-    setEditQuantity(record.quantity.toString());
-  };
-
-  const handleSave = (id: number) => {
-    onUpdate(id, parseInt(editQuantity));
-    setEditingId(null);
-  };
-
   return (
-    <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 rounded-lg p-4 md:p-6 border-2 border-purple-500/30">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-3">
-        <h3 className="text-purple-300 font-bold text-lg">REGISTRO DE MERCADERÍA</h3>
+    <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 rounded-lg p-6 border-2 border-purple-500/30 mt-6">
+      <h3 className="text-purple-300 font-bold text-lg mb-4">REGISTRO DE MERCADERÍA</h3>
+      
+      {/* --- ENCABEZADOS VISIBLES --- */}
+      <div className="grid grid-cols-[150px_1fr_120px_120px] gap-4 py-2 px-4 bg-cyan-900/40 border border-cyan-500/50 rounded-t-lg text-cyan-300 font-bold text-xs">
+        <div>CÓDIGO ART.</div>
+        <div>DESCRIPCIÓN</div>
+        <div className="text-center">CANT.</div>
+        <div className="text-center">ACCIONES</div>
       </div>
-      <div className="bg-[#0a0e27]/50 rounded-lg p-4 max-h-[400px] overflow-auto">
+
+      <div className="bg-[#0a0e27]/50 rounded-b-lg p-4 max-h-[400px] overflow-auto border-x border-b border-purple-500/30">
         {records.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Package className="w-20 h-20 text-purple-500/30 mb-4" />
-            <p className="text-purple-400/60 text-lg">NO HAY REGISTROS</p>
-          </div>
+          <div className="text-center py-12 text-purple-400/60">NO HAY REGISTROS</div>
         ) : (
           <div className="min-w-[700px]">
-            <div className="grid grid-cols-[150px_1fr_120px_120px] gap-4 text-sm mb-3 pb-2 border-b border-purple-500/30">
-              <div className="text-cyan-400 font-bold">CÓDIGO DE ARTÍCULO</div>
-              <div className="text-cyan-400 font-bold">DESCRIPCIÓN</div>
-              <div className="text-cyan-400 font-bold text-center">CANTIDAD</div>
-              <div className="text-cyan-400 font-bold text-center">ACCIONES</div>
-            </div>
-            
             {records.map((record) => (
-              <div key={record.id} className="grid grid-cols-[150px_1fr_120px_120px] gap-4 text-sm py-3 border-b border-purple-500/10 hover:bg-purple-900/20 transition-all">
-                <div className="text-cyan-300">{record.code}</div>
-                <div className="text-cyan-300">{record.description}</div>
+              <div key={record.id} className="grid grid-cols-[150px_1fr_120px_120px] gap-4 py-3 border-b border-purple-500/10 items-center">
+                {/* Forzamos que se vea algo aunque el dato venga vacío para debuggear */}
+                <div className="text-cyan-300 font-mono">{record.code || "---"}</div>
+                <div className="text-cyan-100 uppercase text-sm truncate">{record.description || "SIN DESCRIPCIÓN"}</div>
+                
                 <div className="text-center">
                   {editingId === record.id ? (
-                    <input
-                      type="number"
-                      value={editQuantity}
-                      onChange={(e) => setEditQuantity(e.target.value)}
-                      className="w-20 bg-[#0a0e27] border border-purple-500 rounded px-2 py-1 text-purple-300 text-center"
-                      autoFocus
-                    />
+                    <input type="number" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value)} className="w-20 bg-[#0a0e27] border border-purple-500 rounded px-2 text-center text-purple-300" autoFocus />
                   ) : (
-                    <span className="text-purple-300 font-bold">{record.quantity}</span>
+                    <span className="text-purple-300 font-bold text-xl">{record.quantity}</span>
                   )}
                 </div>
+
                 <div className="flex justify-center gap-2">
-                  {editingId === record.id ? (
-                    <>
-                      <button
-                        onClick={() => handleSave(record.id)}
-                        className="bg-green-600 hover:bg-green-500 text-white w-7 h-7 rounded flex items-center justify-center"
-                      >
-                        ✓
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="bg-gray-600 hover:bg-gray-500 text-white w-7 h-7 rounded flex items-center justify-center"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleEdit(record)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white w-7 h-7 rounded flex items-center justify-center"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => onDelete(record.id)}
-                        className="bg-red-600 hover:bg-red-500 text-white w-7 h-7 rounded flex items-center justify-center"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </>
-                  )}
+                  <button onClick={() => onDelete(record.id)} className="bg-red-600 text-white w-8 h-8 rounded flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
             ))}

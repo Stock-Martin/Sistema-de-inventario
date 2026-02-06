@@ -37,18 +37,24 @@ export function useInventory(marbeteNumber: string) {
     fetchRecords();
   }, [marbeteNumber]);
 
-  const addRecord = async (record: {
-    marbete_number: string;
-    product_id: number;
-    ean: string;
+  // Función corregida y bien integrada
+  const addRecord = async (record: { 
+    marbete_number: string; 
+    product_id: number; 
+    ean: string; 
     quantity: number;
+    code: string;        
+    description: string; 
   }) => {
     try {
-      await fetch('/api/inventory', {
+      const response = await fetch('/api/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(record),
       });
+
+      if (!response.ok) throw new Error('Error en la respuesta del servidor');
+
       await fetchRecords();
       return true;
     } catch (error) {

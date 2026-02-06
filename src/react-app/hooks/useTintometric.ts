@@ -37,25 +37,27 @@ export function useTintometric(sucursal: string) {
     fetchRecords();
   }, [sucursal]);
 
-  const addRecord = async (record: {
-    sucursal: string;
-    product_id: number;
-    ean: string;
-    quantity: number;
-  }) => {
-    try {
-      await fetch('/api/tintometric', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(record),
-      });
-      await fetchRecords();
-      return true;
-    } catch (error) {
-      console.error('Error adding tintometric record:', error);
-      return false;
-    }
-  };
+const addRecord = async (record: {
+  sucursal: string;
+  product_id: number;
+  ean: string;
+  quantity: number;
+  code: string;        // <--- AGREGA ESTO
+  description: string; // <--- AGREGA ESTO
+}) => {
+  try {
+    await fetch('/api/tintometrico', { // Ajusta la ruta si es diferente
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record),
+    });
+    await fetchRecords();
+    return true;
+  } catch (error) {
+    console.error('Error adding tintometric record:', error);
+    return false;
+  }
+};
 
   const updateRecord = async (id: number, quantity: number) => {
     try {
